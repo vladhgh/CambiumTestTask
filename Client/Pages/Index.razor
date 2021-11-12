@@ -6,7 +6,7 @@
 @code {
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await jsRuntime.InvokeVoidAsync("renderjQueryComponents");
+        await jsRuntime.InvokeVoidAsync("loadDots");
         await base.OnAfterRenderAsync(firstRender);
     }
 }
