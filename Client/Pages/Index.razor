@@ -1,0 +1,12 @@
+﻿@page "/"
+@inject IJSRuntime jsRuntime
+
+<div id="container"></div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await jsRuntime.InvokeVoidAsync("renderjQueryComponents");
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}
