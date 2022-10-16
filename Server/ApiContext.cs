@@ -7,7 +7,6 @@ namespace LasmartTest.Server
 	{
 		public ApiContext(DbContextOptions<ApiContext> options)
 			: base(options){}
-		public DbSet<Dot> Dots { get; set; }
-		public DbSet<Comment> Comments { get; set; }
+		public DbSet<Rover> Rovers { get; set; }
 	}
 }

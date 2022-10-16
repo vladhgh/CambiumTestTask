@@ -1,12 +1,267 @@
 ﻿@page "/"
+@using LasmartTest.Shared
+@using System.IO
+@using System.Diagnostics
+@inject HttpClient Http
 @inject IJSRuntime jsRuntime
 
-<div id="container"></div>
+<BSContainer Container="Container.Large">
+
+    @*Row with conrtols and list of deployed rovers*@
+    <BSRow Align="Align.Start">
+
+        @*Column with input controls*@
+        <BSCol ColumnSmall="4" ColumnMedium="4">
+
+            @*Mars surface aka 'Grid' size selector*@
+            <BSRow MarginBottom="BlazorStrap.Margins.Medium">
+                <BSCol ColumnSmall="6" ColumnMedium="6">
+                    <BSLabel>Number of rows:</BSLabel>
+                    <BSInput InputType="InputType.Number" IsDisabled="@GridEditDisabled" placeholder="Enter number of rows" @bind-Value="NumberOfRows"/>
+                </BSCol>
+                <BSCol ColumnSmall="6" ColumnMedium="6">
+                    <BSLabel>Number of columns:</BSLabel>
+                    <BSInput InputType="InputType.Number" IsDisabled="@GridEditDisabled" placeholder="Enter number of columns" @bind-Value="NumberOfColumns"/>
+                </BSCol>
+            </BSRow>
+
+            @*Rover instructions uploader*@
+            <BSRow MarginBottom="BlazorStrap.Margins.Medium">
+                <BSCol ColumnSmall="6" ColumnMedium="6">
+                    <BSLabel>Deploy rovers with instructions from file:</BSLabel>
+                    <BSInputFile IsRequired="true" ValidWhen="@(() => Modal.HasFile)" OnChange="OnFileChange"/>
+                    <BSFeedback For="() => Modal.HasFile"/>
+                </BSCol>
+                <BSCol ColumnSmall="3" ColumnMedium="3" Align="Align.End">
+                    <BSButton Color="BSColor.Primary" @onclick="DeployRovers">Deploy Rovers</BSButton>
+                </BSCol>
+                <BSCol ColumnSmall="3" ColumnMedium="3" Align="Align.End">
+                    <BSButton Color="BSColor.Primary" @onclick="StartRovers">Start Rovers</BSButton>
+                </BSCol>
+            </BSRow>
+
+            @*Manual rover deployer*@
+            <BSRow MarginBottom="BlazorStrap.Margins.ExtraSmall">
+                <BSCol ColumnSmall="6" ColumnMedium="6">
+                    <BSLabel>Or deploy rovers manually:</BSLabel>
+                </BSCol>
+            </BSRow>
+            <BSRow MarginBottom="BlazorStrap.Margins.Medium">
+                <BSCol ColumnSmall="3" ColumnMedium="3">
+                    <BSLabel>Row:</BSLabel>
+                    <BSInput InputType="InputType.Number" placeholder="Row" @bind-Value="NewRoverPositionY"/>
+                </BSCol>
+                <BSCol ColumnSmall="3" ColumnMedium="3">
+                    <BSLabel>Column:</BSLabel>
+                    <BSInput InputType="InputType.Number" placeholder="Column" @bind-Value="NewRoverPositionX"/>
+                </BSCol>
+                <BSCol ColumnSmall="2" ColumnMedium="2" Align="Align.End">
+                    <BSLabel>Initial Direction:</BSLabel>
+                    <BSInput InputType="InputType.Select" @bind-Value="NewRoverDirection" >
+                        @foreach (var direction in LasmartTest.Shared.Direction.DirectionMap)
+                        {
+                            <option value="@direction.Key">@direction.Value</option>
+                        }
+                    </BSInput>
+                </BSCol>
+                <BSCol ColumnSmall="4" ColumnMedium="4" Align="Align.End">
+                    <BSButton Color="BSColor.Primary" @onclick="DeployNewRoverAction">Deploy</BSButton>
+                </BSCol>
+            </BSRow>
+        </BSCol>
+
+        @*List of deployed rover with an option to move them around*@
+        <BSCol ColumnSmall="8" ColumnMedium="8">
+            <BSLabel>Deployed rovers:</BSLabel>
+            <div>
+                @foreach (var deployedRover in DeployedRovers)
+               {
+                   <BSRow MarginBottom="BlazorStrap.Margins.Medium">
+                       <BSCol ColumnSmall="1" ColumnMedium="1" Align="Align.End">
+                            <BSLabel>Id:</BSLabel>
+                             <BSInput InputType="InputType.Number" IsDisabled="true" @bind-Value="deployedRover.Id"/>
+                        </BSCol>
+                       <BSCol ColumnSmall="1" ColumnMedium="1" Align="Align.End">
+                            <BSLabel>Row:</BSLabel>
+                            <BSInput InputType="InputType.Number" IsDisabled="true" @bind-Value="deployedRover.PositionY"/>
+                        </BSCol>
+                        <BSCol ColumnSmall="1" ColumnMedium="1" Align="Align.End">
+                            <BSLabel>Column:</BSLabel>
+                            <BSInput InputType="InputType.Number" IsDisabled="true" @bind-Value="deployedRover.PositionX"/>
+                        </BSCol>
+                        <BSCol ColumnSmall="2" ColumnMedium="2" Align="Align.End">
+                            <BSLabel>Action:</BSLabel>
+                            <BSInput InputType="InputType.Select" @bind-Value="deployedRover.NextAction" >
+                                @foreach (var action in LasmartTest.Shared.Action.ActionMap)
+                               {
+                                   <option value="@action.Key">@action.Value</option>
+                               }
+                            </BSInput>
+                        </BSCol>
+                        <BSCol ColumnSmall="2" ColumnMedium="2" Align="Align.End">
+                            <BSButton Color="BSColor.Primary" @onclick="() => MoveRover(deployedRover)">Move</BSButton>
+                        </BSCol>
+                   </BSRow>
+               }
+            </div>
+        </BSCol>
+    </BSRow>
+
+    @*Mars Surface aka 'Grid'*@
+    <BSRow Align="Align.Center">
+        <BSCol ColumnSmall="8" ColumnMedium="12">
+            <BSLabel>Mars Surface:</BSLabel>
+            <div>
+            @for (var i = NumberOfRows - 1; i >= 0; i--)
+            {
+                <div id="row-@i" class="marsSurfaceRow">
+                    @for (var j = 0; j < NumberOfColumns; j++)
+                    {
+                        <div id="column-@j" class="marsSurfaceColumn @RoverDeployedOnCell(i, j)"></div>
+                    }
+                </div>
+            }
+            </div>
+        </BSCol>
+    </BSRow>
+</BSContainer>
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private int NumberOfRows { get; set; }
+
+    private int NumberOfColumns { get; set; }
+
+    private char NewRoverDirection { get; set; }
+
+    private int NewRoverPositionX { get; set; }
+
+    private int NewRoverPositionY { get; set; }
+
+    private string RoverInstructionsString { get; set; }
+
+    private bool GridEditDisabled { get; set; } = false;
+
+    private List<Rover> DeployedRovers = new List<Rover>();
+
+    private ModalClass Modal { get; set; } = new ModalClass();
+
+    private class ModalClass
     {
-        await jsRuntime.InvokeVoidAsync("loadDots");
-        await base.OnAfterRenderAsync(firstRender);
+        public bool? HasFile { get; set; }
+    }
+
+    private async Task OnFileChange(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount > 0)
+        {
+            MemoryStream ms = new MemoryStream();
+            await e.File.OpenReadStream().CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            this.RoverInstructionsString = System.Text.Encoding.Default.GetString(bytes);
+        }
+    }
+
+    private async Task DeployRovers()
+    {
+        this.GridEditDisabled = true;
+        var roverInstructions = this.RoverInstructionsString.Split(Environment.NewLine);
+        foreach (var roverInstruction in roverInstructions)
+        {
+            var deployCoordinats = roverInstruction.Split('|')[0];
+            var newRover = new Rover
+                {
+                    PositionX = Int32.Parse(deployCoordinats.Split(' ')[0]),
+                    PositionY = Int32.Parse(deployCoordinats.Split(' ')[1]),
+                    CurrentDirection = deployCoordinats.Split(' ')[2].ToCharArray()[0]
+                };
+            await this.DeployNewRover(newRover);
+        }
+    }
+
+    private async Task StartRovers()
+    {
+        var roverNumber = 0;
+        var roverInstructions = this.RoverInstructionsString.Split(Environment.NewLine);
+        foreach (var roverInstruction in roverInstructions)
+        {
+            var roverActions = roverInstruction.Split('|')[1];
+            var roverToMove = this.DeployedRovers[roverNumber];
+            foreach (var roverAction in roverActions)
+            {
+                roverToMove.NextAction = roverAction;
+                await this.MoveRover(roverToMove);
+                base.StateHasChanged();
+            }
+            ++roverNumber;
+        }
+    }
+
+    private string RoverDeployedOnCell(int row, int column)
+    {
+        if (DeployedRovers.Count > 0)
+        {
+            var deployedRover = this.DeployedRovers.FirstOrDefault(rover => rover.PositionX == column && rover.PositionY == row);
+            return deployedRover == null ? "" : deployedRover.GetClassName();
+        }
+        return "";
+    }
+
+    private async Task MoveRover(Rover rover)
+    {
+        var response = await Http.PostAsJsonAsync<Rover>("api/rover/move", rover);
+        if (response.IsSuccessStatusCode)
+        {
+            var updatePosition = await response.Content.ReadFromJsonAsync<Rover>();
+            var isNewPositionInBounds = await this.CheckPositionInBounds(updatePosition.PositionX, updatePosition.PositionY);
+            if (!isNewPositionInBounds)
+            {
+                //TODO: Use logger
+                Debug.WriteLine("Trying to move rover out of bounds!");
+                return;
+            }
+            var deplopyedRover = DeployedRovers.Find(deployedRover => deployedRover.Id == rover.Id);
+            deplopyedRover.PositionX = updatePosition.PositionX;
+            deplopyedRover.PositionY = updatePosition.PositionY;
+            deplopyedRover.CurrentDirection = updatePosition.CurrentDirection;
+        } else
+        {
+            //TODO: Use logger
+            Debug.WriteLine(await response.Content.ReadAsStringAsync());
+        }
+    }
+
+    private async void DeployNewRoverAction()
+    {
+        this.GridEditDisabled = true;
+        var newRover = new Rover
+            {
+                PositionX = NewRoverPositionX,
+                PositionY = NewRoverPositionY,
+                CurrentDirection = NewRoverDirection
+            };
+        await this.DeployNewRover(newRover);
+    }
+
+    private async Task DeployNewRover(Rover rover)
+    {
+        var response = await Http.PostAsJsonAsync<Rover>("api/rover/deploy", rover);
+        var deployedRover = await response.Content.ReadFromJsonAsync<Rover>();
+        var deployedRoverInBounds = await this.CheckPositionInBounds(deployedRover.PositionX, deployedRover.PositionY);
+        if (!deployedRoverInBounds)
+        {
+            return;
+        }
+        DeployedRovers.Add(deployedRover);
+        base.StateHasChanged();
+    }
+
+    private async Task<bool> CheckPositionInBounds(int positionX, int positionY)
+    {
+        if (positionX >= this.NumberOfColumns || positionY >= this.NumberOfRows)
+        {
+            await jsRuntime.InvokeVoidAsync("alert", "Coordinates are out of bounds! Operation aborted!");
+            return false;
+        }
+        return true;
     }
 }
