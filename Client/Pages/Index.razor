@@ -5,7 +5,7 @@
 @inject HttpClient Http
 @inject IJSRuntime jsRuntime
 
-<BSContainer Container="Container.Large">
+<BSContainer Container="Container.Fluid">
 
     @*Row with conrtols and list of deployed rovers*@
     <BSRow Align="Align.Start">
@@ -55,7 +55,7 @@
                     <BSLabel>Column:</BSLabel>
                     <BSInput InputType="InputType.Number" placeholder="Column" @bind-Value="NewRoverPositionX"/>
                 </BSCol>
-                <BSCol ColumnSmall="2" ColumnMedium="2" Align="Align.End">
+                <BSCol ColumnSmall="3" ColumnMedium="3" Align="Align.End">
                     <BSLabel>Initial Direction:</BSLabel>
                     <BSInput InputType="InputType.Select" @bind-Value="NewRoverDirection" >
                         @foreach (var direction in LasmartTest.Shared.Direction.DirectionMap)
@@ -64,8 +64,8 @@
                         }
                     </BSInput>
                 </BSCol>
-                <BSCol ColumnSmall="4" ColumnMedium="4" Align="Align.End">
-                    <BSButton Color="BSColor.Primary" @onclick="DeployNewRoverAction">Deploy</BSButton>
+                <BSCol ColumnSmall="3" ColumnMedium="3" Align="Align.End">
+                    <BSButton Color="BSColor.Primary" @onclick="DeployNewRoverAction">Deploy Rover</BSButton>
                 </BSCol>
             </BSRow>
         </BSCol>
